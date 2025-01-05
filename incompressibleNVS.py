@@ -2,13 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 X_CELL_NUM = 20
-Y_CELL_NUM = 100
+Y_CELL_NUM = 20
 
-DIST = 0.1
-DELTA_T = 0.001
+DIST = 1
+DELTA_T = 0.02
 
-MU = 0.01
-RO = 10
+MU = 0.5
+RO = 20
 
 #np.seterr(invalid='ignore')
 
@@ -36,7 +36,7 @@ def calc_stencil_matrix_laplacian(size_x, size_y):
                  
     return finite_difference_matrix 
     
-LAPLACIAN_MATRIX = calc_stencil_matrix_laplacian(X_CELL_NUM-2, Y_CELL_NUM-2)
+LAPLACIAN_MATRIX = calc_stencil_matrix_laplacian(X_CELL_NUM, Y_CELL_NUM)
 print(calc_stencil_matrix_laplacian(3, 3))
 
 def mat_to_vec(m):
@@ -87,16 +87,8 @@ def laplacian2(scalar_field, size_x, size_y, h):
 def convective_derivative(u,v,prop, size_x, size_y, h):
     return u*central_fin_dif_x(prop, size_x, size_y, h) + v*central_fin_dif_y(prop, size_x, size_y, h)
     
-def solve_poisson(div_H, size_x, size_y):
-    div_H_reduced = np.ones((size_x-2, size_y-2))
-    for x in range(1, size_x-1):
-        for y in range(1, size_y-1):
-            div_H_reduced[x-1][y-1] = div_H[x][y]
-    p_red = vec_to_mat(np.linalg.solve(LAPLACIAN_MATRIX, mat_to_vec(div_H_reduced)), size_x-2, size_y-2)
-    p = np.ones((size_x, size_y))
-    for x in range(0, size_x-2):
-        for y in range(0, size_y-2):
-            p[x+1][y+1] = p_red[x][y]
+def solve_poisson(div_H, size_x, size_y):      
+    p = vec_to_mat(np.linalg.solve(LAPLACIAN_MATRIX, mat_to_vec(div_H)), size_x, size_y)
     return p
     
 def solve_poisson2(div_H, u, v, ro, dt):
@@ -115,14 +107,15 @@ def main():
     
     fig, (ax1,ax2,ax3,ax4) = plt.subplots(4)
     
-    #u[9][30] = 1
-    #u[10][30] = -1
+    # for i in range(5):
+    #    v[5][10] = 100
+    #u[10][30] = -100
     #p[9][31] = 50
     
     pressure_history = []
 
     
-    for t in range(1000):
+    for t in range(100000):
         # calculate H_i
         H_u = MU*laplacian2(u, X_CELL_NUM, Y_CELL_NUM, DIST)-convective_derivative(u, v, u, X_CELL_NUM, Y_CELL_NUM, DIST)
         H_v = MU*laplacian2(v, X_CELL_NUM, Y_CELL_NUM, DIST)-convective_derivative(u, v, v, X_CELL_NUM, Y_CELL_NUM, DIST)
@@ -140,9 +133,22 @@ def main():
         print(f"mean pressure: {p.mean()}")
         print(f"mean u: {u.mean()}")
         print(f"mean v: {v.mean()}")
+        print(f"max divergence of velocity: {divergence(u,v, X_CELL_NUM, Y_CELL_NUM, DIST).max()}")
         
         u+=(-central_fin_dif_x(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_u)*DELTA_T
         v+=(-central_fin_dif_y(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_v)*DELTA_T
+        
+        for x in range(X_CELL_NUM):
+            u[x][0] = 0
+            u[x][-1] = 0
+            v[x][0] = 0
+            v[x][-1] = 0
+        for y in range(Y_CELL_NUM):
+            u[0][y] = 0
+            u[-1][y] = 0
+            v[0][y] = 10
+            v[-1][y] = 0
+        
         ax1.clear()
         ax1.set_title("Pressure")
         ax1.imshow(p)
