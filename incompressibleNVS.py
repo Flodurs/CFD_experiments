@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-X_CELL_NUM = 20
-Y_CELL_NUM = 20
+X_CELL_NUM = 10
+Y_CELL_NUM = 10
 
 DIST = 1
-DELTA_T = 0.02
+DELTA_T = 0.01
 
-MU = 0.5
-RO = 20
+MU = 4
+RO = 2
 
 #np.seterr(invalid='ignore')
 
@@ -36,7 +36,9 @@ def calc_stencil_matrix_laplacian(size_x, size_y):
                  
     return finite_difference_matrix 
     
-LAPLACIAN_MATRIX = calc_stencil_matrix_laplacian(X_CELL_NUM, Y_CELL_NUM)
+LAPLACIAN_MATRIX = calc_stencil_matrix_laplacian(X_CELL_NUM-2, Y_CELL_NUM-2)
+print(LAPLACIAN_MATRIX.shape)
+#LAPLACIAN_MATRIX = np.pad(LAPLACIAN_MATRIX, ((1, 1),(1,1)), 'constant')
 print(calc_stencil_matrix_laplacian(3, 3))
 
 def mat_to_vec(m):
@@ -87,8 +89,9 @@ def laplacian2(scalar_field, size_x, size_y, h):
 def convective_derivative(u,v,prop, size_x, size_y, h):
     return u*central_fin_dif_x(prop, size_x, size_y, h) + v*central_fin_dif_y(prop, size_x, size_y, h)
     
-def solve_poisson(div_H, size_x, size_y):      
-    p = vec_to_mat(np.linalg.solve(LAPLACIAN_MATRIX, mat_to_vec(div_H)), size_x, size_y)
+def solve_poisson(div_H,u,v, size_x, size_y,h, ro):      
+    p = vec_to_mat(np.linalg.solve(LAPLACIAN_MATRIX, mat_to_vec(((div_H+divergence(u,v,size_x,size_y,h))*ro)[1:-1,1:-1])), size_x-2, size_y-2)
+    p = np.pad(p, ((1, 1),(1,1)), 'edge')
     return p
     
 def solve_poisson2(div_H, u, v, ro, dt):
@@ -109,7 +112,7 @@ def main():
     
     # for i in range(5):
     #    v[5][10] = 100
-    #u[10][30] = -100
+    # u[10][10] = 10
     #p[9][31] = 50
     
     pressure_history = []
@@ -123,20 +126,25 @@ def main():
         div_H = divergence(H_u, H_v, X_CELL_NUM, Y_CELL_NUM, DIST)
         
         # solve poisson equation to obtain pressure field
-        p = solve_poisson(div_H, X_CELL_NUM, Y_CELL_NUM)
+        p = solve_poisson(div_H, u, v, X_CELL_NUM, Y_CELL_NUM, DIST, RO)
         
         max_pressure_grad = p.max()-p.min()
         pressure_history.append(max_pressure_grad)
+        
+        
+        u+=(-central_fin_dif_x(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_u)*DELTA_T
+        v+=(-central_fin_dif_y(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_v)*DELTA_T
+        
+        #u[10][10] = 0
+        #v[10][10] = 0
+        
         print("-------------------------------")
         print(f"Iteration: {t}")
         print(f"max pressure gradient: {max_pressure_grad}")
         print(f"mean pressure: {p.mean()}")
         print(f"mean u: {u.mean()}")
         print(f"mean v: {v.mean()}")
-        print(f"max divergence of velocity: {divergence(u,v, X_CELL_NUM, Y_CELL_NUM, DIST).max()}")
-        
-        u+=(-central_fin_dif_x(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_u)*DELTA_T
-        v+=(-central_fin_dif_y(p, X_CELL_NUM, Y_CELL_NUM, DIST)*(1/RO) + H_v)*DELTA_T
+        print(f"max divergence of velocity: {divergence(u,v, X_CELL_NUM, Y_CELL_NUM, DIST)[1:-1][1:-1].max()}")
         
         for x in range(X_CELL_NUM):
             u[x][0] = 0
@@ -151,13 +159,13 @@ def main():
         
         ax1.clear()
         ax1.set_title("Pressure")
-        ax1.imshow(p)
+        ax1.imshow(p, cmap="seismic")
         ax2.clear()
         ax2.set_title("u")
-        ax2.imshow(u)
+        ax2.imshow(u, cmap="seismic")
         ax3.clear()
         ax3.set_title("v")
-        ax3.imshow(v)
+        ax3.imshow(v, cmap="seismic")
         ax4.clear()
         ax4.set_title("max pressure gradient")
         ax4.plot(pressure_history)
